@@ -89,11 +89,11 @@ The union of a family `F` of initial segments of a subset is an initial segment.
 -/
 lemma sUnion_of_IsSegment {F : Set (Set α)} (hF : ∀M ∈ F, M ⊑ C) : ⋃₀ F ⊑ C := by
   constructor
-  · intro s sinUnF
-    obtain ⟨M, MinF, sinM⟩ := sinUnF
+  · intro s sInUnionF
+    obtain ⟨M, MinF, sinM⟩ := sInUnionF
     exact (hF M MinF).1 sinM
-  · intro c cinC s sinUnF cles
-    obtain ⟨M, MinF, sinM⟩ := sinUnF
+  · intro c cinC s sInUnionF cles
+    obtain ⟨M, MinF, sinM⟩ := sInUnionF
     exact ⟨M, MinF, (hF M MinF).2 c cinC s sinM cles⟩
 
 /--

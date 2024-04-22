@@ -3,7 +3,7 @@ Chain Bounding
 
 Formalization of the core ideas extracted from G. Incatasciato's proof of Zorn's
 Lemma (ZL). It accompanies the paper in collaboration *Chain Bounding and the Leanest
-proof of Zorn's Lemma*.
+proof of Zorn's Lemma* ([arXiv:2404.11638](https://arxiv.org/abs/2404.11638)).
 
 All the results are included in the file `GreatestGoodChain.lean`, and include
   * the existence of a greatest *good* chain for every operator on the powerset

@@ -10,7 +10,7 @@ package «ChainBounding» where
   -- add any additional package configuration options here
 
 require mathlib from git
-  "https://github.com/leanprover-community/mathlib4.git"
+  "https://github.com/leanprover-community/mathlib4.git" @ "03616a12cdf1e3f499349f69e80eee82b28745bc"
 
 @[default_target]
 lean_lib «ChainBounding» where

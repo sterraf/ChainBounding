@@ -1,5 +1,6 @@
-import Mathlib.Order.Chain
+import Mathlib.Order.Preorder.Chain
 import Mathlib.Order.CompletePartialOrder
+import Mathlib.Data.Set.Lattice.Bounded
 
 variable {α : Type*}
 
@@ -29,7 +30,7 @@ variable [PartialOrder α]
 lemma IsSegment_refl (S : Set α) : S ⊑ S := ⟨fun _ b => b, fun _ a _ _ _ => a⟩
 
 lemma ssubset_of_IsPropSegment {S C : Set α} (prseg : S ⊏ C) : S ⊂ C :=
-    ssubset_of_ne_of_subset prseg.2 prseg.1.1
+    Set.ssubset_iff_subset_ne.mpr ⟨prseg.1.1, prseg.2⟩
 
 /--
 The relation of being an initial segment is transitive.
@@ -104,7 +105,7 @@ lemma exists_strictBound_of_IsSegment (S C : Set α) (hSC : S ⊏ C) (cha : IsCh
   obtain ⟨c, hc⟩ := exists_of_ssubset <| ssubset_of_subset_of_ne hSC.1.1 hSC.2
   existsi c
   have : ∀ s ∈ S, s < c := by
-    by_contra cle ; push_neg at cle
+    by_contra cle ; push Not at cle
     obtain ⟨s, hs⟩ := cle
     have comparable : s ≠ c → s ≤ c ∨ c ≤ s := cha (hSC.1.1 hs.1) hc.1
     by_cases s_eq_c : s = c
@@ -143,11 +144,11 @@ lemma ssubset_g {S C : Set α} (GC : Good C) (prseg : S ⊏ C) : S ⊂ g S :=
 lemma comparability (C D : Set α) (goodC : Good C) (goodD : Good D) :
     C ⊑ D ∨ D ⊑ C := by
   let S := {M : Set α | M ⊑ C ∧ M ⊑ D}
-  have segs : (∀ M ∈ S, M ⊑ C) ∧ (∀ M ∈ S, M ⊑ D) := by
-    unfold_let; simp only [mem_setOf_eq]; tauto
+  have segs : (∀ M ∈ S, M ⊑ C) ∧ (∀ M ∈ S, M ⊑ D) :=
+    ⟨fun M hM => hM.1, fun M hM => hM.2⟩
   have UnSseg : (⋃₀ S) ⊑ C ∧ (⋃₀ S) ⊑ D :=
     ⟨sUnion_of_IsSegment segs.1, sUnion_of_IsSegment segs.2⟩
-  by_contra incomp ; push_neg at incomp
+  by_contra incomp ; push Not at incomp
   have UnSne: ⋃₀ S ≠ C ∧ ⋃₀ S ≠ D := by aesop
   have UnSprsegC : ⋃₀ S ⊏ C := ⟨UnSseg.1, UnSne.1⟩
   have succ_segC : (g (⋃₀ S)) ⊑ C := (goodC.2 ⟨UnSseg.1, UnSne.1⟩).2
@@ -177,7 +178,8 @@ Every good chain is a segment of `U`.
 -/
 lemma IsSegment_U_of_Good {D : Set α} (goodD : Good D) : D ⊑ U := by
   constructor
-  · exact subset_sUnion_of_mem goodD
+  · intro x hx
+    exact ⟨D, goodD, hx⟩
   · intro c c_in_U d d_in_D c_le_d
     obtain ⟨C, Good_C⟩ := c_in_U
     rcases comparability C D Good_C.1 goodD with CsegD | DsegC
@@ -251,14 +253,16 @@ lemma not_mem_f {C : Set α} (hC : IsChain (· ≤ ·) C) : f C ∉ C := by
 lemma ssubset_g {C : Set α} (hC : IsChain (· ≤ ·) C) : C ⊂ g C := by
   apply ssubset_of_ne_of_subset
   · exact (fun h => not_mem_f hC $ Eq.subset h.symm $ mem_union_right C rfl)
-  · exact subset_union_left C {f C}
+  · exact subset_union_left
 
 lemma le_f {C : Set α} (hC : IsChain (· ≤ ·) C) (c : ↑(g C)): c ≤ f C := by
   have : ↑c ∈ g C := c.property
   have : ↑c ∈ insert (f C) C := by simp_all
   by_cases cinC : ↑c ∈ C
   · exact le_of_lt (strbds C hC (↑c) cinC)
-  · exact le_of_eq $ eq_of_not_mem_of_mem_insert (s := C) this cinC
+  · rcases mem_insert_iff.mp this with h | h
+    · exact le_of_eq h
+    · exact absurd h cinC
 
 /--
 Class for chains in a poset.
@@ -271,6 +275,7 @@ instance {C : Set α} : Top ↑(g C) := ⟨f C, mem_union_right C rfl⟩
 instance orderTop_successor {C : Set α} [Chain C] : OrderTop ↑(g C) :=
   ⟨fun c => le_f (C := C) Chain.chain c⟩
 
+omit [OrderSelector α] [ChainBounding α] in
 /--
 A segment containing the top element is the whole thing.
 -/
@@ -287,7 +292,7 @@ lemma subset_of_IsSegment_successor {C S : Set α} [Chain C] (Sprseg : S ⊏ (g 
   intro s sinS
   rcases Sprseg.1.1 sinS with h | _
   · exact h
-  · simp_all only [union_singleton, mem_singleton_iff]
+  · simp_all only [mem_singleton_iff]
 
 /--
 A chain is a segment of its successor.
@@ -299,8 +304,7 @@ lemma IsSegment_successor {C : Set α} (chain : IsChain (· ≤ ·) C) : IsSegme
     rcases hc with cinC | hc
     · exact cinC
     · have : s < c := by rw [hc] ; exact strbds C chain s hs
-      have : False := not_lt_of_le cles this
-      contradiction
+      exfalso; exact lt_irrefl c (lt_of_le_of_lt cles this)
 
 /--
 The successor good chain is good as well.
@@ -315,13 +319,14 @@ lemma Good_successor (C : Set α) (goodC : Good C) : Good (g C) := by
     have SsegC : IsSegment S C := IsSegment_of_Subset C (g C) _ Cseg.left Sprseg.1 SsubC
     rcases em (S = C) with rfl | SneqC
     · constructor <;> try rfl
-      intros ; simp_all only [union_singleton, ne_eq, mem_insert_iff]
+      simp_all only []
     · constructor
       · exact (goodC.2 ⟨SsegC, SneqC⟩).1
       · calc
         g S ⊑ C   := (goodC.2 ⟨SsegC, SneqC⟩).2
         _   ⊑ g C := Cseg
 
+include α in
 /--
 There is no assigment of a strict upper bound to each chain in a poset.
 -/
@@ -378,7 +383,7 @@ Every poset has a chain without strict upper bounds.
 -/
 lemma unbounded_chain [PartialOrder α] [Inhabited α] :
     ∃ C, IsChain (· ≤ ·) C ∧ ¬ ∃ sb : α, ∀ a ∈ C, a < sb := by
-  by_contra strbd; push_neg at strbd
+  by_contra strbd; push Not at strbd
   have : UnboundedChain α := ⟨strbd⟩
   have : ChainBounding α := ⟨UnboundedChain.f_bounds (α := α)⟩
   exact chain_bounding (α := α)
@@ -393,7 +398,7 @@ def IsMaximal [LE α] (m : α) := ∀ z, m ≤ z → z = m
 lemma zorn [PartialOrder α] [Inhabited α]
     (ind : ∀ (C : Set α), IsChain (· ≤ ·) C → ∃ ub, ∀ a ∈ C, a ≤ ub) : ∃ (x : α), IsMaximal x := by
   obtain ⟨C, chain, subd⟩ := unbounded_chain (α := α)
-  push_neg at subd
+  push Not at subd
   obtain ⟨ub, hub⟩ := ind C chain
   existsi ub
   intro z hz
@@ -407,13 +412,13 @@ section BourbakiWitt
 
 theorem bourbaki_witt_of_complete [CompletePartialOrder α] (g : α → α) (hg : ∀x, x ≤ g x) :
     ∃ x, g x = x := by
-  by_contra noFix ; push_neg at noFix
+  by_contra noFix ; push Not at noFix
   let inst : OrderSelector α := ⟨(g $ sSup ·)⟩
   have : ChainBounding α := by
     constructor
     intro C chain a ha
     calc
-      a ≤ sSup C := DirectedOn.le_sSup (directedOn chain) ha
+      a ≤ sSup C := DirectedOn.le_sSup (IsChain.directedOn chain) ha
       _ < OrderSelector.f C := lt_of_le_of_ne' (hg (sSup C)) (noFix (sSup C))
   exact chain_bounding (α := α)
 

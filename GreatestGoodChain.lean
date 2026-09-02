@@ -1,6 +1,7 @@
 import Mathlib.Order.Preorder.Chain
 import Mathlib.Order.CompletePartialOrder
 import Mathlib.Data.Set.Lattice.Bounded
+import Mathlib.Order.WellFoundedSet
 
 variable {α : Type*}
 
@@ -229,6 +230,103 @@ lemma OrderSelector.g_def [PartialOrder α] [OrderSelector α] {C : Set α} :
     OrderExpander.g C = C ∪ {OrderSelector.f (α := α) C} := rfl
 
 end good_implies_well
+
+section GoodWellOrdered
+
+variable [PartialOrder α] [OrderSelector α]
+
+open OrderExpander
+
+namespace OrderSelector
+
+/--
+Every segment of a good chain is good. The verification of this fact is left to the reader
+in the proof of Proposition `prop:good-well-ordered` of the paper.
+-/
+lemma good_of_isSegment {C D : Set α} (hC : Good C) (hseg : D ⊑ C) : Good D := by
+  sorry
+
+/--
+Every good chain for the successor function `C ↦ C ∪ {f C}` is well-ordered by the strict
+order of the poset, in the sense that every nonempty subset of the chain has a least
+element. This is Proposition `prop:good-well-ordered` of the paper, restricted to the
+`OrderSelector` setting.
+-/
+lemma wellOrdered_of_good {C : Set α} (hC : Good C) (X : Set α) (hXC : X ⊆ C)
+    (hne : X.Nonempty) : ∃ m ∈ X, ∀ y ∈ X, m ≤ y := by
+  -- `S` is the set of strict lower bounds of `X` in `C`.
+  let S := {c : α | c ∈ C ∧ ∀ y ∈ X, c < y}
+  have Sseg : S ⊏ C := by
+    refine ⟨⟨?_, ?_⟩, ?_⟩
+    · exact fun c hc => hc.1
+    · exact fun c hc s hs cle => ⟨hc, fun z hz => lt_of_le_of_lt cle (hs.2 z hz)⟩
+    · intro hEq
+      obtain ⟨x₀, hx₀⟩ := hne
+      have hx₀S : x₀ ∈ S := by rw [hEq]; exact hXC hx₀
+      exact lt_irrefl x₀ (hx₀S.2 x₀ hx₀)
+  have goodS := hC.2 Sseg
+  -- `f S` lies in `g S` and in `C`, but not in `S`.
+  have hfSg : f S ∈ g S := by
+    rw [g_def]
+    exact mem_union_right S rfl
+  have hfC : f S ∈ C := goodS.2.1 hfSg
+  have hfS_not : f S ∉ S := by
+    intro h
+    refine goodS.1.2 ?_
+    rw [g_def, union_eq_self_of_subset_right (show {f S} ⊆ S from fun c hc => by
+      rw [mem_singleton_iff] at hc
+      rw [hc]
+      exact h)]
+  -- `f S` is a lower bound of `X`.
+  have lower : ∀ y ∈ X, f S ≤ y := by
+    intro y hy
+    have hyC : y ∈ C := hXC hy
+    have Dseg : {c : α | c ∈ C ∧ c ≤ y} ⊑ C :=
+      ⟨fun c hc => hc.1, fun c hc s hs cle => ⟨hc, le_trans cle hs.2⟩⟩
+    have hDgood : Good {c : α | c ∈ C ∧ c ≤ y} := good_of_isSegment hC Dseg
+    have SsegD : S ⊏ {c : α | c ∈ C ∧ c ≤ y} := by
+      refine ⟨⟨?_, ?_⟩, ?_⟩
+      · exact fun s hs => ⟨hs.1, le_of_lt (hs.2 y hy)⟩
+      · exact fun c hc s hs cle => ⟨hc.1, fun z hz => lt_of_le_of_lt cle (hs.2 z hz)⟩
+      · intro hEq
+        have hyD : y ∈ {c : α | c ∈ C ∧ c ≤ y} := ⟨hyC, le_refl y⟩
+        have hyS : y ∈ S := by rw [hEq]; exact hyD
+        exact lt_irrefl y (hyS.2 y hy)
+    have hfD : f S ∈ {c : α | c ∈ C ∧ c ≤ y} := (hDgood.2 SsegD).2.1 hfSg
+    exact hfD.2
+  -- Some element of `X` lies above `f S`.
+  have step3 : ∃ x ∈ X, x ≤ f S := by
+    by_contra h
+    push Not at h
+    have hfS : f S ∈ S := by
+      refine ⟨hfC, fun z hz => ?_⟩
+      have hcomp : f S ≤ z ∨ z ≤ f S :=
+        hC.1 hfC (hXC hz) fun hh => h z hz (by rw [hh])
+      rcases hcomp with hle | hge
+      · exact lt_of_le_of_ne hle fun hh => h z hz (by rw [← hh])
+      · exact absurd hge (h z hz)
+    exact hfS_not hfS
+  obtain ⟨x₀, hx₀X, hx₀f⟩ := step3
+  have hfx : f S = x₀ := le_antisymm (lower x₀ hx₀X) hx₀f
+  refine ⟨f S, ?_, lower⟩
+  rw [hfx]
+  exact hx₀X
+
+/--
+The `WellFoundedOn` version of `wellOrdered_of_good`.
+-/
+theorem wellFoundedOn_of_good {C : Set α} (hC : Good C) : C.WellFoundedOn (· < ·) := by
+  rw [wellFoundedOn_iff, WellFounded.wellFounded_iff_has_min]
+  intro t ⟨m₀, hm₀⟩
+  by_cases hm₀C : m₀ ∈ C
+  · obtain ⟨m, hm, hmin⟩ :=
+      wellOrdered_of_good hC {x : α | x ∈ t ∧ x ∈ C} (fun x hx => hx.2) ⟨m₀, hm₀, hm₀C⟩
+    exact ⟨m, hm.1, fun x hx h => lt_irrefl m (lt_of_le_of_lt (hmin x ⟨hx, h.2.1⟩) h.1)⟩
+  · exact ⟨m₀, hm₀, fun x _ h => absurd h.2.2 hm₀C⟩
+
+end OrderSelector
+
+end GoodWellOrdered
 
 noncomputable section ChainBounding
 

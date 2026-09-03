@@ -87,6 +87,26 @@ lemma IsSegment_of_Subset (D U S : Set α) (hDU : D ⊆ U) (hSU : S ⊑ U)
   exact ⟨sub, fun x hx y hy hxy => hSU.right x (hDU hx) y hy hxy⟩
 
 /--
+Segments of a chain are comparable.
+-/
+lemma IsSegment_total {A B C : Set α} (hchain : IsChain (· ≤ ·) C) (hA : A ⊑ C) (hB : B ⊑ C) :
+    A ⊑ B ∨ B ⊑ A := by
+  have hsub : A ⊆ B ∨ B ⊆ A := by
+    by_contra h
+    have hAB : ¬(A ⊆ B) := fun hsub => h (Or.inl hsub)
+    have hBA : ¬(B ⊆ A) := fun hsub => h (Or.inr hsub)
+    obtain ⟨a, haA, haB⟩ := Set.not_subset.mp hAB      -- a ∈ A, a ∉ B
+    obtain ⟨b, hbB, hbA⟩ := Set.not_subset.mp hBA      -- b ∈ B, b ∉ A
+    have hab : a ≠ b := fun hh => haB (by rw [hh]; exact hbB)
+    have hcomp : a ≤ b ∨ b ≤ a := hchain (hA.1 haA) (hB.1 hbB) hab
+    rcases hcomp with hle | hge
+    · exact haB (hB.2 a (hA.1 haA) b hbB hle)   -- a ≤ b puts a ∈ B, contra
+    · exact hbA (hA.2 b (hB.1 hbB) a haA hge)   -- b ≤ a puts b ∈ A, contra
+  rcases hsub with h | h
+  · exact Or.inl (IsSegment_of_Subset B C A hB.1 hA h)
+  · exact Or.inr (IsSegment_of_Subset A C B hA.1 hB h)
+
+/--
 The union of a family `F` of initial segments of a subset is an initial segment.
 -/
 lemma sUnion_of_IsSegment {F : Set (Set α)} (hF : ∀M ∈ F, M ⊑ C) : ⋃₀ F ⊑ C := by
@@ -244,7 +264,27 @@ Every segment of a good chain is good. The verification of this fact is left to 
 in the proof of Proposition `prop:good-well-ordered` of the paper.
 -/
 lemma good_of_isSegment {C D : Set α} (hC : Good C) (hseg : D ⊑ C) : Good D := by
-  sorry
+  constructor
+  · exact hC.1.mono hseg.1                      -- D is a chain: restriction of C's chain property
+  · intro S hSD
+    have hSC : S ⊏ C := IsPropSegment_of_IsPropSegment_of_IsSegment hSD hseg
+    have goodS := hC.2 hSC                      -- S ⊏ g S ∧ g S ⊑ C
+    rcases IsSegment_total hC.1 goodS.2 hseg with hgD | DgS
+    · exact ⟨goodS.1, hgD⟩                      -- dichotomy case 1: done directly
+    · -- case 2: D ⊑ g S; S ⊊ D forces f S ∈ D, hence g S ⊆ D
+      obtain ⟨d, hdD, hdS⟩ := exists_of_ssubset (ssubset_of_IsPropSegment hSD)
+      have hdgS : d ∈ g S := DgS.1 hdD
+      have hdfS : d = f S := by
+        rw [g_def] at hdgS
+        rcases mem_or_mem_of_mem_union hdgS with h' | h'
+        · exact absurd h' hdS
+        · exact mem_singleton_iff.mp h'
+      have hfSD : f S ∈ D := by rw [← hdfS]; exact hdD
+      have hgD : g S ⊆ D := by
+        rw [g_def]
+        exact union_subset hSD.1.1 (show {f S} ⊆ D from fun c hc => by
+          rw [mem_singleton_iff] at hc; rw [hc]; exact hfSD)
+      exact ⟨goodS.1, IsSegment_of_Subset D C (g S) hseg.1 goodS.2 hgD⟩
 
 /--
 Every good chain for the successor function `C ↦ C ∪ {f C}` is well-ordered by the strict
